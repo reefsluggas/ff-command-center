@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FF Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0f11;
+    --card: rgba(255, 255, 255, 0.055);
+    --card-border: rgba(255, 255, 255, 0.09);
+    --text: #f2f2f0;
+    --muted: #9a9a94;
+    --faint: #6b6b66;
+    --gold: #FDB827;
+    --gold-dim: rgba(253, 184, 39, 0.15);
+    --red: #ff5f56;
+    --red-dim: rgba(255, 95, 86, 0.13);
+    --amber: #ffbd2e;
+    --amber-dim: rgba(255, 189, 46, 0.13);
+    --green: #4cd964;
+    --green-dim: rgba(76, 217, 100, 0.12);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    min-height: 100vh;
+    padding: 24px clamp(14px, 4vw, 40px) 60px;
+    max-width: 1240px; margin: 0 auto;
+  }
+
+  header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+  .h-left { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .h-title { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+  .h-week { font-size: 15px; font-weight: 600; color: var(--gold); background: var(--gold-dim); padding: 4px 13px; border-radius: 999px; }
+  .h-right { font-size: 14px; color: var(--muted); font-weight: 500; }
+
+  /* alert summary */
+  .alert-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .alert-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13.5px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+    background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,95,86,0.25);
+    cursor: pointer;
+  }
+  .alert-chip.warn { background: var(--amber-dim); color: var(--amber); border-color: rgba(255,189,46,0.25); }
+  .alert-chip.ok { background: var(--green-dim); color: var(--green); border-color: rgba(76,217,100,0.22); cursor: default; }
+  .alert-chip .lg { color: var(--text); font-weight: 500; opacity: 0.7; }
+
+  /* league tabs */
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .tab {
+    font-family: inherit; font-size: 14.5px; font-weight: 600; color: var(--muted);
+    background: var(--card); border: 1px solid var(--card-border);
+    padding: 8px 16px; border-radius: 999px; cursor: pointer;
+  }
+  .tab.on { color: #1a1503; background: var(--gold); border-color: var(--gold); }
+  .tab:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .layout { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+  .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 18px; padding: 18px 20px;
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  }
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; gap: 10px; }
+  .card-title { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .card-sub { font-size: 12.5px; color: var(--faint); font-weight: 500; text-align: right; }
+
+  /* matchup */
+  .matchup { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .m-side { min-width: 0; }
+  .m-side.right { text-align: right; }
+  .m-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m-rec { font-size: 12.5px; color: var(--muted); }
+  .m-pts { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; }
+  .m-pts.lead { color: var(--gold); }
+  .m-vs { font-size: 12px; color: var(--faint); font-weight: 700; }
+
+  /* suggestions */
+  .sugg { display: flex; flex-direction: column; gap: 8px; }
+  .sugg-row {
+    display: flex; gap: 12px; align-items: baseline;
+    background: var(--gold-dim); border: 1px solid rgba(253,184,39,0.25);
+    border-radius: 12px; padding: 10px 14px;
+  }
+  .sugg-slot { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: var(--gold); min-width: 40px; }
+  .sugg-text { font-size: 15px; line-height: 1.45; }
+  .sugg-text b { font-weight: 700; }
+  .sugg-text .rk { color: var(--muted); font-size: 13px; }
+  .sugg-none { font-size: 14.5px; color: var(--muted); padding: 4px 2px; }
+  .sugg-note { font-size: 12.5px; color: var(--faint); margin-top: 10px; line-height: 1.5; }
+
+  /* roster table */
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    font-size: 11.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--faint); text-align: left; padding: 4px 8px 8px;
+  }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td { padding: 7px 8px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 15px; vertical-align: middle; }
+  tr.flag td { background: var(--red-dim); }
+  tr.warn td { background: var(--amber-dim); }
+  tr.bench-head td {
+    font-size: 11.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--faint); padding-top: 14px; background: none !important; border-top: none;
+  }
+  .slot { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; color: var(--faint); text-transform: uppercase; }
+  .pname { font-weight: 600; }
+  .pmeta { font-size: 12.5px; color: var(--muted); }
+  .badge {
+    font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em;
+    padding: 2.5px 8px; border-radius: 999px; text-transform: uppercase; margin-left: 8px;
+    vertical-align: 1px; display: inline-block;
+  }
+  .badge.out { background: var(--red); color: #1a0505; }
+  .badge.q { background: var(--amber); color: #241a02; }
+  .ecr { font-weight: 700; }
+  .ecr.good { color: var(--green); }
+  .ecr.none { color: var(--faint); font-weight: 500; }
+
+  /* waivers */
+  .w-row { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; padding: 8px 4px; border-top: 1px solid rgba(255,255,255,0.05); }
+  .w-row:first-child { border-top: none; }
+  .w-rank { font-size: 14px; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .w-name { font-size: 15.5px; font-weight: 600; }
+  .w-meta { font-size: 12.5px; color: var(--muted); }
+  .w-side { text-align: right; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .w-side b { color: var(--text); }
+
+  /* standings */
+  .s-row { display: grid; grid-template-columns: 24px 1fr auto auto; gap: 10px; align-items: center; padding: 6px 6px; border-radius: 10px; font-size: 14.5px; }
+  .s-row.me { background: var(--gold-dim); }
+  .s-row.me .s-name { color: var(--gold); font-weight: 700; }
+  .s-rank { font-size: 12.5px; font-weight: 700; color: var(--faint); }
+  .s-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .s-rec { font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .s-pts { color: var(--faint); font-size: 13px; min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  footer { margin-top: 26px; font-size: 12.5px; color: var(--faint); text-align: center; line-height: 1.6; }
+
+  .status-screen {
+    position: fixed; inset: 0; background: var(--bg); z-index: 50;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  }
+  .status-screen.hide { display: none; }
+  .spinner { width: 42px; height: 42px; border-radius: 999px; border: 3px solid rgba(255,255,255,0.12); border-top-color: var(--gold); animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-msg { font-size: 17px; color: var(--muted); font-weight: 500; padding: 0 20px; text-align: center; }
+  .status-msg.err { color: var(--red); }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+
+  .empty-note { font-size: 14.5px; color: var(--muted); line-height: 1.5; padding: 4px 2px; }
+</style>
+</head>
+<body>
+
+<div class="status-screen" id="statusScreen">
+  <div class="spinner"></div>
+  <div class="status-msg" id="statusMsg">Loading…</div>
+</div>
+
+<header>
+  <div class="h-left">
+    <div class="h-title">FF Command Center</div>
+    <div class="h-week" id="weekBadge">—</div>
+  </div>
+  <div class="h-right" id="headerRight">—</div>
+</header>
+
+<div class="alert-strip" id="alertStrip"></div>
+<div class="tabs" id="tabs"></div>
+
+<div class="layout">
+  <div class="col">
+    <div class="card" id="matchupCard" style="display:none">
+      <div class="card-head"><div class="card-title">This Week's Matchup</div></div>
+      <div class="matchup">
+        <div class="m-side">
+          <div class="m-name" id="myName">—</div>
+          <div class="m-rec" id="myRec"></div>
+          <div class="m-pts" id="myPts">0.0</div>
+        </div>
+        <div class="m-vs">VS</div>
+        <div class="m-side right">
+          <div class="m-name" id="oppName">—</div>
+          <div class="m-rec" id="oppRec"></div>
+          <div class="m-pts" id="oppPts">0.0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Start / Sit Suggestions</div>
+        <div class="card-sub" id="suggSub"></div>
+      </div>
+      <div class="sugg" id="suggList"></div>
+      <div class="sugg-note" id="suggNote"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Roster</div>
+        <div class="card-sub" id="rosterSub"></div>
+      </div>
+      <table id="rosterTable">
+        <thead>
+          <tr><th>Slot</th><th>Player</th><th class="num">ECR</th><th class="num">Pts</th></tr>
+        </thead>
+        <tbody id="rosterBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Waiver Targets</div>
+        <div class="card-sub" id="waiverSub">trending adds available in this league</div>
+      </div>
+      <div id="waiverList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title">Standings</div></div>
+      <div id="standingsList"></div>
+    </div>
+  </div>
+</div>
+
+<footer id="footer"></footer>
+
+<script>
+/* =========================================================================
+   FF Command Center — full snapshot website
+   - Sleeper data fetched live in the browser on every visit (no keys)
+   - Consensus rankings (FantasyPros ECR) read from ./data/rankings.json,
+     which a scheduled GitHub Action keeps fresh once the API key is set.
+   - Start/sit suggestions compare each starter's ECR to the best eligible
+     bench option; injured/OUT starters with a healthy ranked bench player
+     are always flagged.
+   ========================================================================= */
+
+const CONFIG = {
+  username: 'sapskull',
+  api: 'https://api.sleeper.app/v1',
+  rankingsUrl: 'data/rankings.json',
+  suggThreshold: 5,      // bench must be ranked this many spots better to suggest
+  trendingLimit: 50,
+  waiverShow: 10
+};
+
+const SLOT_ELIG = {
+  QB: ['QB'], RB: ['RB'], WR: ['WR'], TE: ['TE'], K: ['K'], DEF: ['DEF'],
+  FLEX: ['RB', 'WR', 'TE'], WRRB_FLEX: ['WR', 'RB'], REC_FLEX: ['WR', 'TE'],
+  SUPER_FLEX: ['QB', 'RB', 'WR', 'TE']
+};
+
+const S = {
+  user: null, nflState: null, leagues: [], players: {}, trending: [],
+  rankings: null, leagueIdx: 0
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function jget(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${r.status} on ${url}`);
+  return r.json();
+}
+
+/* ---------- name normalization (mirrors scripts/fetch_rankings.py) ---------- */
+function normName(name) {
+  return name.trim().toLowerCase()
+    .replace(/[.'\-]/g, '')
+    .replace(/\s+(jr|sr|ii|iii|iv|v)\.?$/i, '')
+    .replace(/\s+/g, ' ');
+}
+function playerKey(p, pid) {
+  if (p.p === 'DEF') return `${pid}|DEF`; // Sleeper DEF ids are team abbrevs
+  return `${normName(p.n)}|${p.p}`;
+}
+
+/* ---------- data loading ---------- */
+async function loadPlayers() {
+  try {
+    const cached = localStorage.getItem('ff_players_v3');
+    if (cached) {
+      const obj = JSON.parse(cached);
+      if (Date.now() - obj.ts < 6 * 60 * 60 * 1000) { S.players = obj.map; return; }
+    }
+  } catch (e) { /* fetch fresh */ }
+  setStatus('Downloading player database…');
+  const raw = await jget(`${CONFIG.api}/players/nfl`);
+  const map = {};
+  for (const [id, p] of Object.entries(raw)) {
+    map[id] = {
+      n: p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim() || id,
+      t: p.team || 'FA',
+      p: p.position || (p.fantasy_positions ? p.fantasy_positions[0] : '?'),
+      inj: p.injury_status || null,
+      note: p.injury_body_part || null,
+      st: p.status || null,
+      a: p.active === true,
+      sr: (typeof p.search_rank === 'number' && p.search_rank < 9999) ? p.search_rank : null
+    };
+  }
+  S.players = map;
+  try { localStorage.setItem('ff_players_v2', JSON.stringify({ ts: Date.now(), map })); }
+  catch (e) { /* fine */ }
+}
+
+async function loadRankings() {
+  try {
+    const r = await fetch(CONFIG.rankingsUrl, { cache: 'no-store' });
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data && data.formats) S.rankings = data;
+  } catch (e) { /* site works without rankings */ }
+}
+
+async function loadAll() {
+  S.nflState = await jget(`${CONFIG.api}/state/nfl`);
+  if (!S.user) S.user = await jget(`${CONFIG.api}/user/${CONFIG.username}`);
+
+  let season = S.nflState.league_season || S.nflState.season;
+  let leagues = await jget(`${CONFIG.api}/user/${S.user.user_id}/leagues/nfl/${season}`);
+  if ((!leagues || !leagues.length) && season) {
+    leagues = await jget(`${CONFIG.api}/user/${S.user.user_id}/leagues/nfl/${String(Number(season) - 1)}`);
+  }
+  leagues = leagues || [];
+
+  const week = Math.max(1, S.nflState.week || 1);
+  const inSeason = S.nflState.season_type === 'regular' || S.nflState.season_type === 'post';
+
+  S.leagues = await Promise.all(leagues.map(async (lg) => {
+    const [rosters, users] = await Promise.all([
+      jget(`${CONFIG.api}/league/${lg.league_id}/rosters`),
+      jget(`${CONFIG.api}/league/${lg.league_id}/users`)
+    ]);
+    let matchups = [];
+    if (inSeason && lg.status === 'in_season') {
+      try { matchups = await jget(`${CONFIG.api}/league/${lg.league_id}/matchups/${week}`); }
+      catch (e) { matchups = []; }
+    }
+    const myRoster = rosters.find(r => r.owner_id === S.user.user_id ||
+      (r.co_owners && r.co_owners.includes(S.user.user_id)));
+    return { league: lg, rosters, users, matchups, myRoster };
+  }));
+
+  try {
+    S.trending = await jget(`${CONFIG.api}/players/nfl/trending/add?lookback_hours=24&limit=${CONFIG.trendingLimit}`);
+  } catch (e) { S.trending = []; }
+}
+
+/* ---------- ranking helpers ---------- */
+function formatFor(league) {
+  const rec = league.scoring_settings ? league.scoring_settings.rec : undefined;
+  if (rec === 1) return 'ppr';
+  if (rec === 0.5) return 'half';
+  return 'std';
+}
+function rankFor(L, pid) {
+  if (!S.rankings) return null;
+  const fmt = S.rankings.formats[formatFor(L.league)] || S.rankings.formats.ppr;
+  if (!fmt) return null;
+  const p = S.players[pid];
+  if (!p) return null;
+  return fmt[playerKey(p, pid)] || null;
+}
+
+function injState(pid) {
+  const p = S.players[pid];
+  if (!p) return null;
+  const inj = (p.inj || '').toLowerCase();
+  const st = (p.st || '').toLowerCase();
+  if (inj === 'out' || inj === 'ir' || inj === 'sus' || inj === 'pup' ||
+      st.includes('injured reserve') || st === 'inactive') return 'out';
+  if (inj === 'doubtful') return 'out';
+  if (inj === 'questionable') return 'q';
+  return null;
+}
+
+/* ---------- suggestion engine ---------- */
+function buildSuggestions(L) {
+  if (!L.myRoster) return { list: [], reason: 'no-roster' };
+  if (!S.rankings) return { list: [], reason: 'no-rankings' };
+
+  const my = L.myRoster;
+  const slots = (L.league.roster_positions || []).filter(s => s !== 'BN' && s !== 'IR' && s !== 'TAXI');
+  const starters = my.starters || [];
+  const starterSet = new Set(starters.filter(x => x && x !== '0'));
+  const bench = (my.players || []).filter(pid => !starterSet.has(pid));
+
+  const suggestions = [];
+  const usedBench = new Set();
+
+  starters.forEach((pid, i) => {
+    const slot = slots[i];
+    const elig = SLOT_ELIG[slot];
+    if (!elig) return; // IDP or unknown slot types — skip
+
+    const sRank = pid && pid !== '0' ? rankFor(L, pid) : null;
+    const sInj = pid && pid !== '0' ? injState(pid) : 'out';
+    const sVal = (sInj === 'out' || !sRank) ? Infinity : sRank.rank;
+
+    let best = null;
+    for (const b of bench) {
+      if (usedBench.has(b)) continue;
+      const bp = S.players[b];
+      if (!bp || !elig.includes(bp.p)) continue;
+      if (injState(b) === 'out') continue;
+      const bRank = rankFor(L, b);
+      if (!bRank) continue;
+      if (bRank.rank + CONFIG.suggThreshold < sVal || (sVal === Infinity)) {
+        if (!best || bRank.rank < best.rank) best = { pid: b, rank: bRank.rank };
+      }
+    }
+    if (best) {
+      usedBench.add(best.pid);
+      suggestions.push({
+        slot,
+        inPid: best.pid, inRank: best.rank,
+        outPid: (pid && pid !== '0') ? pid : null,
+        outRank: sRank ? sRank.rank : null,
+        outInjured: sInj === 'out',
+        outEmpty: !pid || pid === '0'
+      });
+    }
+  });
+
+  suggestions.sort((a, b) => (b.outEmpty - a.outEmpty) || (b.outInjured - a.outInjured));
+  return { list: suggestions.slice(0, 6), reason: null };
+}
+
+/* ---------- render ---------- */
+function fmtPts(n) { return (Math.round((n || 0) * 10) / 10).toFixed(1); }
+function teamNameFor(L, roster) {
+  if (!roster) return '—';
+  const u = L.users.find(u => u.user_id === roster.owner_id);
+  return (u && u.metadata && u.metadata.team_name) || (u && u.display_name) || `Team ${roster.roster_id}`;
+}
+function recFor(r) {
+  return r && r.settings ? `${r.settings.wins}-${r.settings.losses}${r.settings.ties ? '-' + r.settings.ties : ''}` : '';
+}
+
+function renderHeader() {
+  const st = S.nflState || {};
+  const type = st.season_type;
+  const weekLabel =
+    type === 'regular' ? `Week ${st.week}` :
+    type === 'post' ? `Playoffs · Wk ${st.week}` :
+    type === 'pre' ? 'Preseason' : 'Offseason';
+  $('weekBadge').textContent = `${st.league_season || st.season || ''} · ${weekLabel}`;
+  $('headerRight').textContent = `@${CONFIG.username} · updated ` +
+    new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function renderAlertStrip() {
+  const strip = $('alertStrip');
+  strip.innerHTML = '';
+  let any = false;
+  S.leagues.forEach((L, idx) => {
+    if (!L.myRoster) return;
+    let outs = 0, qs = 0;
+    const starterSet = new Set((L.myRoster.starters || []).filter(x => x && x !== '0'));
+    for (const pid of starterSet) {
+      const st = injState(pid);
+      if (st === 'out') outs++; else if (st === 'q') qs++;
+    }
+    const empties = (L.myRoster.starters || []).filter(x => !x || x === '0').length;
+    if (L.league.status === 'in_season') outs += empties;
+    if (outs || qs) {
+      any = true;
+      const chip = document.createElement('button');
+      chip.className = 'alert-chip' + (outs ? '' : ' warn');
+      chip.style.font = 'inherit';
+      chip.innerHTML = outs
+        ? `⚠ ${outs} lineup issue${outs === 1 ? '' : 's'} <span class="lg">${esc(L.league.name)}</span>`
+        : `${qs} questionable <span class="lg">${esc(L.league.name)}</span>`;
+      chip.onclick = () => { S.leagueIdx = idx; renderLeague(); renderTabs(); };
+      strip.appendChild(chip);
+    }
+  });
+  if (!any && S.leagues.length) {
+    const chip = document.createElement('div');
+    chip.className = 'alert-chip ok';
+    chip.textContent = '✓ All lineups clean';
+    strip.appendChild(chip);
+  }
+}
+
+function renderTabs() {
+  const tabs = $('tabs');
+  tabs.innerHTML = '';
+  S.leagues.forEach((L, i) => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (i === S.leagueIdx ? ' on' : '');
+    b.textContent = L.league.name;
+    b.onclick = () => { S.leagueIdx = i; renderLeague(); renderTabs(); };
+    tabs.appendChild(b);
+  });
+}
+
+function renderLeague() {
+  const L = S.leagues[S.leagueIdx];
+  if (!L) {
+    $('rosterBody').innerHTML = `<tr><td colspan="4" class="empty-note">No Sleeper leagues found for @${esc(CONFIG.username)} this season.</td></tr>`;
+    return;
+  }
+  renderMatchup(L);
+  renderSuggestions(L);
+  renderRoster(L);
+  renderWaivers(L);
+  renderStandings(L);
+}
+
+function renderMatchup(L) {
+  const card = $('matchupCard');
+  const my = L.myRoster;
+  card.style.display = 'none';
+  if (!my || !L.matchups || !L.matchups.length) return;
+  const mine = L.matchups.find(m => m.roster_id === my.roster_id);
+  if (!mine) return;
+  const opp = L.matchups.find(m => m.matchup_id === mine.matchup_id && m.roster_id !== my.roster_id);
+  const oppRoster = opp ? L.rosters.find(r => r.roster_id === opp.roster_id) : null;
+  $('myName').textContent = teamNameFor(L, my);
+  $('myRec').textContent = recFor(my);
+  $('oppName').textContent = opp ? teamNameFor(L, oppRoster) : 'Bye';
+  $('oppRec').textContent = recFor(oppRoster);
+  const a = mine.points || 0, b = opp ? (opp.points || 0) : 0;
+  $('myPts').textContent = fmtPts(a);
+  $('oppPts').textContent = fmtPts(b);
+  $('myPts').classList.toggle('lead', a >= b);
+  $('oppPts').classList.toggle('lead', b > a);
+  card.style.display = 'block';
+}
+
+function renderSuggestions(L) {
+  const list = $('suggList');
+  const note = $('suggNote');
+  list.innerHTML = '';
+  note.textContent = '';
+
+  const fmt = formatFor(L.league).toUpperCase().replace('STD', 'Standard').replace('HALF', 'Half PPR');
+  $('suggSub').textContent = S.rankings
+    ? `vs. consensus ranks (${fmt}) · updated ${new Date(S.rankings.updated).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+    : '';
+
+  const { list: suggs, reason } = buildSuggestions(L);
+
+  if (reason === 'no-rankings') {
+    list.innerHTML = `<div class="sugg-none">Consensus rankings aren't loaded yet. Suggestions turn on automatically once the FantasyPros key is added and the rankings Action runs. Injury flags below still work.</div>`;
+    return;
+  }
+  if (reason === 'no-roster') {
+    list.innerHTML = `<div class="sugg-none">No roster found in this league.</div>`;
+    return;
+  }
+  if (!suggs.length) {
+    list.innerHTML = `<div class="sugg-none">✓ Your lineup already matches the consensus. No changes suggested.</div>`;
+    return;
+  }
+
+  for (const s of suggs) {
+    const inP = S.players[s.inPid];
+    const row = document.createElement('div');
+    row.className = 'sugg-row';
+    let txt;
+    if (s.outEmpty) {
+      txt = `Fill empty slot with <b>${esc(inP.n)}</b> <span class="rk">(ECR ${s.inRank})</span>`;
+    } else {
+      const outP = S.players[s.outPid];
+      const why = s.outInjured ? ` — ${esc(outP.n)} is ${esc((outP.inj || 'out'))}` : '';
+      txt = `Start <b>${esc(inP.n)}</b> <span class="rk">(ECR ${s.inRank})</span> over <b>${esc(outP.n)}</b> <span class="rk">(ECR ${s.outRank || '—'})</span>${why}`;
+    }
+    row.innerHTML = `<div class="sugg-slot">${esc(s.slot.replace('SUPER_FLEX','SFLX').replace('FLEX','FLX'))}</div><div class="sugg-text">${txt}</div>`;
+    list.appendChild(row);
+  }
+  note.textContent = 'Suggestions compare weekly Expert Consensus Rankings for this league\'s scoring format. Always double-check game times and late injury news before locking in.';
+}
+
+function renderRoster(L) {
+  const body = $('rosterBody');
+  body.innerHTML = '';
+  const my = L.myRoster;
+  $('rosterSub').textContent = `${L.league.total_rosters}-team · ${formatFor(L.league).toUpperCase().replace('STD','Standard').replace('HALF','Half PPR')}`;
+
+  if (!my) {
+    body.innerHTML = `<tr><td colspan="4" class="empty-note">No roster found for you in this league.</td></tr>`;
+    return;
+  }
+  if (L.league.status === 'pre_draft' || L.league.status === 'drafting') {
+    body.innerHTML = `<tr><td colspan="4" class="empty-note">Draft ${L.league.status === 'drafting' ? 'in progress' : 'not yet complete'} — roster appears here after the draft.</td></tr>`;
+    return;
+  }
+
+  const slots = (L.league.roster_positions || []).filter(s => s !== 'BN' && s !== 'IR' && s !== 'TAXI');
+  const starters = my.starters || [];
+  const starterSet = new Set(starters.filter(x => x && x !== '0'));
+  const mine = (L.matchups || []).find(m => m.roster_id === my.roster_id);
+  const ptsMap = mine && mine.players_points ? mine.players_points : {};
+
+  const addRow = (pid, slotLabel) => {
+    const tr = document.createElement('tr');
+    if (!pid || pid === '0') {
+      tr.className = 'flag';
+      tr.innerHTML = `<td class="slot">${esc(slotLabel)}</td><td><span class="pname">Empty slot</span><span class="badge out">Fix</span></td><td class="num ecr none">—</td><td class="num">—</td>`;
+      body.appendChild(tr);
+      return;
+    }
+    const p = S.players[pid] || { n: pid, t: '', p: '' };
+    const st = injState(pid);
+    if (st === 'out') tr.className = 'flag';
+    else if (st === 'q') tr.className = 'warn';
+    const badge = st === 'out'
+      ? `<span class="badge out">${esc((p.inj || 'OUT'))}</span>`
+      : st === 'q' ? `<span class="badge q">QUES</span>` : '';
+    const rk = rankFor(L, pid);
+    const rkHtml = rk ? `<span class="ecr${rk.rank <= 24 ? ' good' : ''}">${rk.rank}</span>` : `<span class="ecr none">—</span>`;
+    const pts = ptsMap[pid];
+    tr.innerHTML = `<td class="slot">${esc(slotLabel)}</td>
+      <td><span class="pname">${esc(p.n)}</span>${badge}<div class="pmeta">${esc(p.p)} · ${esc(p.t)}</div></td>
+      <td class="num">${rkHtml}</td>
+      <td class="num">${pts !== undefined ? fmtPts(pts) : '—'}</td>`;
+    body.appendChild(tr);
+  };
+
+  starters.forEach((pid, i) => {
+    const slot = (slots[i] || 'FLX').replace('SUPER_FLEX', 'SFLX').replace('FLEX', 'FLX').replace('REC_FLEX', 'RFLX');
+    addRow(pid, slot);
+  });
+
+  const bench = (my.players || []).filter(pid => !starterSet.has(pid));
+  if (bench.length) {
+    const hr = document.createElement('tr');
+    hr.className = 'bench-head';
+    hr.innerHTML = `<td colspan="4">Bench</td>`;
+    body.appendChild(hr);
+    // sort bench by ECR so the best options float to the top
+    bench.sort((a, b) => {
+      const ra = rankFor(L, a), rb = rankFor(L, b);
+      return (ra ? ra.rank : 9999) - (rb ? rb.rank : 9999);
+    });
+    for (const pid of bench) addRow(pid, 'BN');
+  }
+}
+
+function valueRank(L, pid) {
+  // consensus rank when loaded, Sleeper's own player rank as fallback
+  const rk = rankFor(L, pid);
+  if (rk) return { v: rk.rank, src: 'ECR' };
+  const p = S.players[pid];
+  if (p && p.sr !== null) return { v: p.sr, src: 'SR' };
+  return null;
+}
+
+function renderWaivers(L) {
+  const list = $('waiverList');
+  list.innerHTML = '';
+  // Tuesday = claims night (waivers run 3am Wednesday)
+  if (new Date().getDay() === 2) {
+    const b = document.createElement('div');
+    b.style.cssText = 'background:var(--gold-dim);border:1px solid rgba(253,184,39,.3);color:var(--gold);font-weight:700;font-size:14px;padding:8px 13px;border-radius:12px;margin-bottom:10px';
+    b.textContent = '⏰ Waivers process tonight at 3am — set your claims';
+    list.appendChild(b);
+  }
+  $('waiverSub').textContent = S.rankings
+    ? 'best available by consensus rank'
+    : 'best available by player rank';
+
+  if (L.league.status === 'pre_draft' || L.league.status === 'drafting') {
+    list.innerHTML = `<div class="empty-note">This league hasn't drafted yet — waiver targets appear once rosters exist.</div>`;
+    $('waiverSub').textContent = '';
+    return;
+  }
+
+  const taken = new Set();
+  // union players + taxi + reserve: taxi squads and IR are tracked separately
+  // in dynasty leagues, and those players are NOT available on waivers
+  for (const r of L.rosters) {
+    for (const pid of (r.players || [])) taken.add(pid);
+    for (const pid of (r.taxi || [])) taken.add(pid);
+    for (const pid of (r.reserve || [])) taken.add(pid);
+  }
+
+  // startable positions in this league (expands flex)
+  const FLEX = { FLEX: ['RB','WR','TE'], WRRB_FLEX: ['WR','RB'], REC_FLEX: ['WR','TE'], SUPER_FLEX: ['QB','RB','WR','TE'] };
+  const pos = new Set();
+  for (const s of (L.league.roster_positions || [])) {
+    if (s === 'BN' || s === 'IR' || s === 'TAXI') continue;
+    if (FLEX[s]) FLEX[s].forEach(x => pos.add(x)); else pos.add(s);
+  }
+
+  // my worst ACTIVE holding per position, by the same value metric.
+  // taxi/IR stashes are excluded: they don't occupy an active roster spot,
+  // so a pickup competes with your active players, not your stashes
+  const myWorst = {};
+  if (L.myRoster) {
+    const stashed = new Set([...(L.myRoster.taxi || []), ...(L.myRoster.reserve || [])]);
+    for (const pid of (L.myRoster.players || [])) {
+      if (stashed.has(pid)) continue;
+      const p = S.players[pid];
+      const r = valueRank(L, pid);
+      if (!p || !r) continue;
+      if (myWorst[p.p] === undefined || r.v > myWorst[p.p].v) myWorst[p.p] = { v: r.v, pid };
+    }
+  }
+
+  const trendMap = {};
+  for (const t of S.trending) trendMap[t.player_id] = t.count;
+
+  const avail = [];
+  for (const [pid, p] of Object.entries(S.players)) {
+    if (taken.has(pid) || !pos.has(p.p)) continue;
+    // whitelist: must be flagged active by Sleeper AND carry Active status —
+    // retired players can linger with a team and a stale rank (hi, Big Ben)
+    if (!p.a || (p.st || '') !== 'Active') continue;
+    if (!p.t || p.t === 'FA') continue;
+    const r = valueRank(L, pid);
+    if (!r || r.v > 500) continue;
+    const w = myWorst[p.p];
+    const upgrade = (!w || r.v < w.v) ? (w ? w.pid : 'empty') : null;
+    avail.push({ pid, p, r, upgrade, trend: trendMap[pid] || 0 });
+  }
+  avail.sort((a, b) => ((b.upgrade !== null) - (a.upgrade !== null)) || (a.r.v - b.r.v));
+  const rows = avail.slice(0, CONFIG.waiverShow);
+
+  if (!rows.length) {
+    list.innerHTML = `<div class="empty-note">No ranked players are available in this league.</div>`;
+    return;
+  }
+  rows.forEach((t, i) => {
+    const fire = t.trend >= 1000 ? ' 🔥' : '';
+    let upTxt = '';
+    if (t.upgrade === 'empty') upTxt = ` · <span style="color:var(--green);font-weight:600">fills empty position</span>`;
+    else if (t.upgrade) {
+      const overP = S.players[t.upgrade];
+      upTxt = ` · <span style="color:var(--green);font-weight:600">upgrade over ${esc(overP ? overP.n : '')}</span>`;
+    }
+    const row = document.createElement('div');
+    row.className = 'w-row';
+    row.innerHTML = `<div class="w-rank">${i + 1}</div>
+      <div><div class="w-name">${esc(t.p.n)}${fire}</div><div class="w-meta">${esc(t.p.p)} · ${esc(t.p.t)}${upTxt}</div></div>
+      <div class="w-side"><b>#${t.r.v}</b> ${t.r.src}</div>`;
+    list.appendChild(row);
+  });
+}
+
+function renderStandings(L) {
+  const list = $('standingsList');
+  list.innerHTML = '';
+  const sorted = [...L.rosters].sort((a, b) => {
+    const aw = a.settings ? a.settings.wins : 0, bw = b.settings ? b.settings.wins : 0;
+    if (bw !== aw) return bw - aw;
+    return ((b.settings && b.settings.fpts) || 0) - ((a.settings && a.settings.fpts) || 0);
+  });
+  sorted.forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 's-row' + (L.myRoster && r.roster_id === L.myRoster.roster_id ? ' me' : '');
+    row.innerHTML = `<div class="s-rank">${i + 1}</div>
+      <div class="s-name">${esc(teamNameFor(L, r))}</div>
+      <div class="s-rec">${recFor(r) || '—'}</div>
+      <div class="s-pts">${r.settings ? fmtPts(r.settings.fpts || 0) : ''}</div>`;
+    list.appendChild(row);
+  });
+}
+
+function renderFooter() {
+  const bits = ['Sleeper data loads live on every visit.'];
+  if (S.rankings) {
+    bits.push(`Consensus rankings updated ${new Date(S.rankings.updated).toLocaleString()} (Week ${S.rankings.week}).`);
+  } else {
+    bits.push('Consensus rankings not yet configured — add a FantasyPros API key to the repo secrets to enable start/sit suggestions.');
+  }
+  $('footer').textContent = bits.join(' ');
+}
+
+function setStatus(msg, isErr) {
+  $('statusScreen').classList.remove('hide');
+  $('statusMsg').textContent = msg;
+  $('statusMsg').classList.toggle('err', !!isErr);
+}
+function hideStatus() { $('statusScreen').classList.add('hide'); }
+
+async function boot() {
+  try {
+    setStatus('Loading…');
+    await loadPlayers();
+    await Promise.all([loadAll(), loadRankings()]);
+    hideStatus();
+    renderHeader();
+    renderAlertStrip();
+    renderTabs();
+    renderLeague();
+    renderFooter();
+  } catch (e) {
+    setStatus(`Couldn't load data — ${e.message}. Refresh to retry.`, true);
+  }
+}
+boot();
+</script>
+</body>
+</html>
